@@ -977,7 +977,8 @@
     // Task banner
     if (state.activeTask) {
       const banner = document.getElementById('task-banner');
-      document.getElementById('task-banner-text').textContent = 'Active Task: ' + state.activeTask;
+      const topic = state.activeTask.topic || state.activeTask.id || state.activeTask;
+      document.getElementById('task-banner-text').textContent = topic;
       banner.classList.add('visible');
     }
 

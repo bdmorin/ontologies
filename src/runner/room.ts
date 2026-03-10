@@ -292,7 +292,9 @@ export class Room {
       tickNumber: this.tickNumber,
       agentStates: this.getAgentStates(),
       queueDepth: this.taskQueue.length,
-      activeTask: this.activeTask?.id ?? null,
+      activeTask: this.activeTask
+        ? { id: this.activeTask.id, topic: this.activeTask.topic }
+        : null,
     });
   }
 
@@ -511,7 +513,9 @@ export class Room {
       tickRate: this.currentTickRate,
       agentCount: this.agents.size,
       queueDepth: this.taskQueue.length,
-      activeTask: this.activeTask?.id ?? null,
+      activeTask: this.activeTask
+        ? { id: this.activeTask.id, topic: this.activeTask.topic }
+        : null,
       agents: this.getAgentStates(),
     };
   }

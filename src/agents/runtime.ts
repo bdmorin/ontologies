@@ -211,7 +211,8 @@ export async function executeAgentResponse(
           resultMessage = message as SDKResultSuccess;
         }
 
-        // Count tool_progress events (emitted per active tool call)
+        // Count tool calls from multiple event types:
+        // 1. tool_progress (emitted for some tool executions)
         if (message.type === "tool_progress") {
           const toolUseId = (message as { tool_use_id?: string }).tool_use_id;
           if (toolUseId && !seenToolIds.has(toolUseId)) {
@@ -219,6 +220,23 @@ export async function executeAgentResponse(
             const toolName = (message as { tool_name?: string }).tool_name ?? "unknown";
             toolCounts[toolName] = (toolCounts[toolName] ?? 0) + 1;
             totalToolCalls++;
+          }
+        }
+
+        // 2. stream_event with content_block_start for tool_use blocks
+        if (message.type === "stream_event") {
+          const evt = (message as { event?: { type?: string; content_block?: { type?: string; name?: string; id?: string } } }).event;
+          if (evt?.type === "content_block_start" && evt.content_block) {
+            const block = evt.content_block;
+            if (
+              (block.type === "tool_use" || block.type === "mcp_tool_use" || block.type === "server_tool_use") &&
+              block.id && !seenToolIds.has(block.id)
+            ) {
+              seenToolIds.add(block.id);
+              const toolName = block.name ?? "unknown";
+              toolCounts[toolName] = (toolCounts[toolName] ?? 0) + 1;
+              totalToolCalls++;
+            }
           }
         }
       }
