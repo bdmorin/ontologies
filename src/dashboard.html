@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ontologies — Live Dashboard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --void: #0a0a0f;
+    --void-soft: #111118;
+    --void-surface: #16161e;
+    --void-border: rgba(255,255,255,0.04);
+    --void-border-bright: rgba(255,255,255,0.08);
+    --amber: #d4a047;
+    --amber-dim: rgba(212,160,71,0.15);
+    --amber-glow: rgba(212,160,71,0.3);
+    --teal: #4fd1c5;
+    --teal-dim: rgba(79,209,197,0.12);
+    --teal-glow: rgba(79,209,197,0.25);
+    --text: #c8c8d0;
+    --text-dim: #6b6b78;
+    --text-bright: #e8e8f0;
+    --red: #e85d75;
+    --red-dim: rgba(232,93,117,0.15);
+    --green: #68d391;
+    --blue: #63b3ed;
+    --purple: #b794f4;
+
+    --font-body: 'Instrument Sans', -apple-system, sans-serif;
+    --font-mono: 'IBM Plex Mono', 'SF Mono', monospace;
+
+    --radius: 6px;
+    --radius-lg: 10px;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--void);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 13px;
+    line-height: 1.5;
+    overflow: hidden;
+  }
+
+  /* Noise overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.012;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+  }
+
+  /* Layout: 3-column */
+  .shell {
+    display: grid;
+    grid-template-columns: 280px 1fr 300px;
+    grid-template-rows: 48px 1fr 140px;
+    height: 100vh;
+    gap: 1px;
+    background: var(--void-border);
+  }
+
+  /* Header bar */
+  .header {
+    grid-column: 1 / -1;
+    background: var(--void-soft);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--void-border);
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .header-title {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-bright);
+    letter-spacing: 0.5px;
+  }
+
+  .header-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: background 0.5s, box-shadow 0.5s;
+  }
+
+  .status-dot.connected {
+    background: var(--green);
+    box-shadow: 0 0 6px rgba(104,211,145,0.4);
+  }
+
+  .status-dot.disconnected {
+    background: var(--red);
+    box-shadow: 0 0 6px rgba(232,93,117,0.4);
+    animation: pulse-red 2s ease-in-out infinite;
+  }
+
+  .header-metrics {
+    display: flex;
+    gap: 20px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+
+  .metric {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-dim);
+  }
+
+  .metric-value {
+    color: var(--teal);
+    font-weight: 500;
+  }
+
+  .metric-label {
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-size: 9px;
+  }
+
+  /* Panels */
+  .panel {
+    background: var(--void-soft);
+    overflow: hidden;
+    position: relative;
+  }
+
+  .panel-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--void-border);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--void);
+  }
+
+  /* Left panel: Activity Feed */
+  .feed {
+    grid-column: 1;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .feed-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    scroll-behavior: smooth;
+  }
+
+  .feed-scroll::-webkit-scrollbar { width: 3px; }
+  .feed-scroll::-webkit-scrollbar-track { background: transparent; }
+  .feed-scroll::-webkit-scrollbar-thumb { background: var(--void-border-bright); border-radius: 3px; }
+
+  .feed-item {
+    padding: 6px 8px;
+    margin-bottom: 4px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    line-height: 1.45;
+    animation: feed-in 0.3s ease-out;
+    border-left: 2px solid transparent;
+  }
+
+  .feed-item.type-message {
+    border-left-color: var(--teal);
+    background: var(--teal-dim);
+  }
+
+  .feed-item.type-emote {
+    border-left-color: var(--purple);
+    background: rgba(183,148,244,0.06);
+    font-style: italic;
+    color: var(--text-dim);
+  }
+
+  .feed-item.type-scene {
+    border-left-color: var(--amber);
+    background: var(--amber-dim);
+  }
+
+  .feed-item.type-system, .feed-item.type-task {
+    border-left-color: var(--blue);
+    background: rgba(99,179,237,0.06);
+  }
+
+  .feed-from {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 11px;
+    margin-bottom: 2px;
+    color: var(--text-bright);
+  }
+
+  .feed-content {
+    color: var(--text);
+    word-break: break-word;
+  }
+
+  .feed-time {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  /* Center: FSM Topology */
+  .topology {
+    grid-column: 2;
+    grid-row: 2;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .topology svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Right panel: Agent Cards */
+  .agents-panel {
+    grid-column: 3;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .agents-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+  }
+
+  .agents-scroll::-webkit-scrollbar { width: 3px; }
+  .agents-scroll::-webkit-scrollbar-track { background: transparent; }
+  .agents-scroll::-webkit-scrollbar-thumb { background: var(--void-border-bright); border-radius: 3px; }
+
+  .agent-card {
+    background: var(--void);
+    border: 1px solid var(--void-border);
+    border-radius: var(--radius-lg);
+    padding: 12px;
+    margin-bottom: 8px;
+    transition: border-color 0.5s, box-shadow 0.5s;
+  }
+
+  .agent-card.state-RESPONDING {
+    border-color: var(--amber);
+    box-shadow: 0 0 12px var(--amber-dim), inset 0 0 12px var(--amber-dim);
+  }
+
+  .agent-card.state-EMOTING {
+    border-color: var(--purple);
+    box-shadow: 0 0 8px rgba(183,148,244,0.1);
+  }
+
+  .agent-card.state-COOLDOWN {
+    border-color: var(--void-border-bright);
+  }
+
+  .agent-name {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-bright);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .agent-state-badge {
+    font-size: 9px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-family: var(--font-mono);
+  }
+
+  .badge-IDLE { background: var(--void-surface); color: var(--text-dim); }
+  .badge-RESPONDING { background: var(--amber-dim); color: var(--amber); animation: badge-pulse 1.5s ease-in-out infinite; }
+  .badge-EMOTING { background: rgba(183,148,244,0.15); color: var(--purple); }
+  .badge-COOLDOWN { background: rgba(99,179,237,0.1); color: var(--blue); }
+
+  .agent-gauges {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .gauge {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .gauge-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-dim);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .gauge-value {
+    color: var(--text);
+  }
+
+  .gauge-bar {
+    height: 3px;
+    background: var(--void-surface);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .gauge-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1), background 0.4s;
+  }
+
+  .gauge-fill.energy { background: var(--green); }
+  .gauge-fill.energy.low { background: var(--red); }
+  .gauge-fill.boredom { background: var(--amber); }
+  .gauge-fill.mood-pos { background: var(--teal); }
+  .gauge-fill.mood-neg { background: var(--red); }
+  .gauge-fill.cooldown { background: var(--blue); }
+
+  /* Bottom: System Metrics */
+  .metrics-bar {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    background: var(--void);
+    border-top: 1px solid var(--void-border);
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+  }
+
+  .metric-card {
+    background: var(--void-soft);
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .metric-card-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  .metric-card-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+  }
+
+  .metric-card-value {
+    font-family: var(--font-mono);
+    font-size: 28px;
+    font-weight: 300;
+    color: var(--text-bright);
+    line-height: 1;
+    margin: 6px 0 4px;
+  }
+
+  .metric-card-value.amber { color: var(--amber); }
+  .metric-card-value.teal { color: var(--teal); }
+
+  .sparkline-container {
+    height: 28px;
+    position: relative;
+  }
+
+  .sparkline-container canvas {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Task banner */
+  .task-banner {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(180deg, transparent, var(--amber-dim));
+    padding: 10px 16px;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    border-top: 1px solid rgba(212,160,71,0.15);
+    z-index: 10;
+  }
+
+  .task-banner.visible { display: flex; }
+
+  .task-banner-icon {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--amber);
+    animation: pulse-amber 2s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+
+  .task-banner-text {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--amber);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* SVG elements */
+  .node-ring {
+    fill: none;
+    stroke-width: 2;
+    transition: stroke 0.5s, filter 0.5s;
+  }
+
+  .node-ring.IDLE { stroke: var(--text-dim); }
+  .node-ring.RESPONDING { stroke: var(--amber); filter: drop-shadow(0 0 8px var(--amber-glow)); }
+  .node-ring.EMOTING { stroke: var(--purple); filter: drop-shadow(0 0 6px rgba(183,148,244,0.3)); }
+  .node-ring.COOLDOWN { stroke: var(--blue); filter: drop-shadow(0 0 4px rgba(99,179,237,0.2)); }
+
+  .node-core {
+    transition: fill 0.5s, r 0.3s;
+  }
+
+  .node-core.IDLE { fill: var(--void-surface); }
+  .node-core.RESPONDING { fill: var(--amber-dim); }
+  .node-core.EMOTING { fill: rgba(183,148,244,0.08); }
+  .node-core.COOLDOWN { fill: rgba(99,179,237,0.06); }
+
+  .node-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    fill: var(--text-bright);
+    text-anchor: middle;
+    pointer-events: none;
+  }
+
+  .node-state-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 400;
+    text-anchor: middle;
+    pointer-events: none;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: fill 0.5s;
+  }
+
+  .node-state-label.IDLE { fill: var(--text-dim); }
+  .node-state-label.RESPONDING { fill: var(--amber); }
+  .node-state-label.EMOTING { fill: var(--purple); }
+  .node-state-label.COOLDOWN { fill: var(--blue); }
+
+  .circuit-line {
+    stroke: var(--void-border-bright);
+    stroke-width: 1;
+    fill: none;
+  }
+
+  .circuit-pulse {
+    stroke: var(--teal);
+    stroke-width: 1.5;
+    fill: none;
+    opacity: 0;
+  }
+
+  .center-hub {
+    fill: var(--void);
+    stroke: var(--void-border-bright);
+    stroke-width: 1;
+  }
+
+  .center-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    fill: var(--text-dim);
+    text-anchor: middle;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .center-tick {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    font-weight: 300;
+    fill: var(--teal);
+    text-anchor: middle;
+  }
+
+  /* Energy arc on nodes */
+  .energy-arc {
+    fill: none;
+    stroke-width: 3;
+    stroke-linecap: round;
+    transition: stroke-dasharray 0.6s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.4s;
+  }
+
+  /* Animations */
+  @keyframes feed-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse-amber {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  @keyframes pulse-red {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  @keyframes badge-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  @keyframes responding-orbit {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  /* Empty state */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-align: center;
+    padding: 20px;
+    gap: 8px;
+  }
+
+  .empty-state-icon {
+    font-size: 24px;
+    opacity: 0.3;
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <span class="header-title">ONTOLOGIES</span>
+      <div class="header-status">
+        <span class="status-dot" id="ws-dot"></span>
+        <span id="ws-status">connecting</span>
+      </div>
+    </div>
+    <div class="header-metrics">
+      <div class="metric">
+        <span class="metric-label">Tick</span>
+        <span class="metric-value" id="hdr-tick">0</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Rate</span>
+        <span class="metric-value" id="hdr-rate">--</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Queue</span>
+        <span class="metric-value" id="hdr-queue">0</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Agents</span>
+        <span class="metric-value" id="hdr-agents">0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Left: Activity Feed -->
+  <div class="panel feed">
+    <div class="panel-header">
+      <span>Activity Feed</span>
+      <span id="feed-count">0</span>
+    </div>
+    <div class="feed-scroll" id="feed-scroll">
+      <div class="empty-state" id="feed-empty">
+        <div class="empty-state-icon">~</div>
+        <div>Waiting for activity</div>
+        <div>Submit a task to see agents work</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Center: FSM Topology -->
+  <div class="panel topology" id="topology">
+    <div class="panel-header">
+      <span>FSM Topology</span>
+      <span id="topo-responding">0 active</span>
+    </div>
+    <svg id="topo-svg"></svg>
+    <div class="task-banner" id="task-banner">
+      <div class="task-banner-icon"></div>
+      <span class="task-banner-text" id="task-banner-text"></span>
+    </div>
+  </div>
+
+  <!-- Right: Agent Cards -->
+  <div class="panel agents-panel">
+    <div class="panel-header">
+      <span>Agents</span>
+      <span id="agent-count">0</span>
+    </div>
+    <div class="agents-scroll" id="agents-container"></div>
+  </div>
+
+  <!-- Bottom: Metrics -->
+  <div class="metrics-bar">
+    <div class="metric-card">
+      <div class="metric-card-header">
+        <span class="metric-card-label">Tick Number</span>
+      </div>
+      <div class="metric-card-value teal" id="mc-tick">0</div>
+      <div class="sparkline-container"><canvas id="spark-tick"></canvas></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-card-header">
+        <span class="metric-card-label">Active Agents</span>
+      </div>
+      <div class="metric-card-value amber" id="mc-active">0</div>
+      <div class="sparkline-container"><canvas id="spark-active"></canvas></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-card-header">
+        <span class="metric-card-label">Messages</span>
+      </div>
+      <div class="metric-card-value" id="mc-messages">0</div>
+      <div class="sparkline-container"><canvas id="spark-messages"></canvas></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-card-header">
+        <span class="metric-card-label">Engrams</span>
+      </div>
+      <div class="metric-card-value" id="mc-engrams">0</div>
+      <div class="sparkline-container"><canvas id="spark-engrams"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ── State ──────────────────────────────────────────────────
+  const state = {
+    connected: false,
+    tickNumber: 0,
+    tickRate: 0,
+    queueDepth: 0,
+    activeTask: null,
+    agents: {},       // name -> AgentState
+    messages: [],     // feed items
+    messageCount: 0,
+    engramCount: 0,
+    // Sparkline histories (last 60 data points)
+    history: {
+      tick: [],
+      active: [],
+      messages: [],
+      engrams: [],
+    },
+  };
+
+  // ── WebSocket ──────────────────────────────────────────────
+  let ws = null;
+  let reconnectTimer = null;
+  const WS_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
+
+  function connect() {
+    if (ws && ws.readyState < 2) return;
+    ws = new WebSocket(WS_URL);
+
+    ws.onopen = () => {
+      state.connected = true;
+      updateConnectionStatus();
+      if (reconnectTimer) { clearInterval(reconnectTimer); reconnectTimer = null; }
+    };
+
+    ws.onclose = () => {
+      state.connected = false;
+      updateConnectionStatus();
+      if (!reconnectTimer) {
+        reconnectTimer = setInterval(connect, 3000);
+      }
+    };
+
+    ws.onerror = () => { ws.close(); };
+
+    ws.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data);
+        handleEvent(msg);
+      } catch(e) { /* ignore malformed */ }
+    };
+  }
+
+  // ── Heartbeat ──────────────────────────────────────────────
+  setInterval(() => {
+    if (ws && ws.readyState === 1) {
+      ws.send(JSON.stringify({ type: 'ping' }));
+    }
+  }, 15000);
+
+  // ── Event Handling ─────────────────────────────────────────
+  function handleEvent(msg) {
+    switch(msg.type) {
+      case 'connected':
+        handleConnected(msg.status);
+        break;
+      case 'stateChange':
+        handleStateChange(msg.agent, msg.state);
+        break;
+      case 'tick':
+        handleTick(msg.data);
+        break;
+      case 'message':
+        handleMessage(msg.message);
+        break;
+      case 'taskComplete':
+        handleTaskComplete(msg.task);
+        break;
+    }
+  }
+
+  function handleConnected(status) {
+    state.tickNumber = status.tickNumber || 0;
+    state.tickRate = status.tickRate || 0;
+    state.queueDepth = status.queueDepth || 0;
+    state.activeTask = status.activeTask;
+
+    if (status.agents) {
+      for (const [name, agentState] of Object.entries(status.agents)) {
+        state.agents[name] = agentState;
+      }
+    }
+
+    updateAll();
+    buildTopology();
+    buildAgentCards();
+  }
+
+  function handleStateChange(agentName, agentState) {
+    const prev = state.agents[agentName];
+    state.agents[agentName] = agentState;
+
+    updateAgentNode(agentName, agentState);
+    updateAgentCard(agentName, agentState);
+
+    // Fire circuit pulse if transitioning to RESPONDING
+    if (agentState.fsm === 'RESPONDING' && (!prev || prev.fsm !== 'RESPONDING')) {
+      fireCircuitPulse(agentName);
+    }
+  }
+
+  function handleTick(data) {
+    state.tickNumber = data.tickNumber;
+    state.queueDepth = data.queueDepth;
+    state.activeTask = data.activeTask;
+
+    if (data.agentStates) {
+      for (const [name, agentState] of Object.entries(data.agentStates)) {
+        state.agents[name] = agentState;
+        updateAgentNode(name, agentState);
+        updateAgentCard(name, agentState);
+      }
+    }
+
+    // Update sparkline history
+    const activeCount = Object.values(state.agents).filter(a => a.fsm === 'RESPONDING').length;
+    pushHistory('tick', state.tickNumber);
+    pushHistory('active', activeCount);
+
+    updateMetrics();
+    updateCenterHub();
+  }
+
+  function handleMessage(msg) {
+    state.messageCount++;
+    state.messages.push(msg);
+    if (state.messages.length > 200) state.messages = state.messages.slice(-200);
+
+    pushHistory('messages', state.messageCount);
+    addFeedItem(msg);
+    updateMetrics();
+  }
+
+  function handleTaskComplete(task) {
+    state.engramCount++;
+    pushHistory('engrams', state.engramCount);
+    state.activeTask = null;
+
+    const banner = document.getElementById('task-banner');
+    banner.classList.remove('visible');
+
+    updateMetrics();
+  }
+
+  // ── Sparkline History ──────────────────────────────────────
+  function pushHistory(key, value) {
+    state.history[key].push(value);
+    if (state.history[key].length > 60) state.history[key].shift();
+  }
+
+  // ── UI Updates ─────────────────────────────────────────────
+  function updateConnectionStatus() {
+    const dot = document.getElementById('ws-dot');
+    const label = document.getElementById('ws-status');
+    dot.className = 'status-dot ' + (state.connected ? 'connected' : 'disconnected');
+    label.textContent = state.connected ? 'connected' : 'disconnected';
+  }
+
+  function updateMetrics() {
+    const activeCount = Object.values(state.agents).filter(a => a.fsm === 'RESPONDING').length;
+
+    document.getElementById('hdr-tick').textContent = state.tickNumber;
+    document.getElementById('hdr-rate').textContent = state.tickRate ? (state.tickRate / 1000).toFixed(1) + 's' : '--';
+    document.getElementById('hdr-queue').textContent = state.queueDepth;
+    document.getElementById('hdr-agents').textContent = Object.keys(state.agents).length;
+
+    document.getElementById('mc-tick').textContent = state.tickNumber;
+    document.getElementById('mc-active').textContent = activeCount;
+    document.getElementById('mc-messages').textContent = state.messageCount;
+    document.getElementById('mc-engrams').textContent = state.engramCount;
+
+    document.getElementById('topo-responding').textContent = activeCount + ' active';
+    document.getElementById('agent-count').textContent = Object.keys(state.agents).length;
+    document.getElementById('feed-count').textContent = state.messages.length;
+
+    // Task banner
+    if (state.activeTask) {
+      const banner = document.getElementById('task-banner');
+      document.getElementById('task-banner-text').textContent = 'Active Task: ' + state.activeTask;
+      banner.classList.add('visible');
+    }
+
+    // Sparklines
+    drawSparkline('spark-tick', state.history.tick, '#4fd1c5');
+    drawSparkline('spark-active', state.history.active, '#d4a047');
+    drawSparkline('spark-messages', state.history.messages, '#c8c8d0');
+    drawSparkline('spark-engrams', state.history.engrams, '#68d391');
+  }
+
+  function updateAll() {
+    updateMetrics();
+    updateConnectionStatus();
+  }
+
+  // ── Sparkline Canvas ───────────────────────────────────────
+  function drawSparkline(canvasId, data, color) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || data.length < 2) return;
+
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const w = rect.width;
+    const h = rect.height;
+    const min = Math.min(...data);
+    const max = Math.max(...data);
+    const range = max - min || 1;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Gradient fill under the line
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, color + '20');
+    grad.addColorStop(1, 'transparent');
+
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    for (let i = 0; i < data.length; i++) {
+      const x = (i / (data.length - 1)) * w;
+      const y = h - ((data[i] - min) / range) * (h - 4) - 2;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    for (let i = 0; i < data.length; i++) {
+      const x = (i / (data.length - 1)) * w;
+      const y = h - ((data[i] - min) / range) * (h - 4) - 2;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // End dot
+    if (data.length > 0) {
+      const lastX = w;
+      const lastY = h - ((data[data.length - 1] - min) / range) * (h - 4) - 2;
+      ctx.beginPath();
+      ctx.arc(lastX, lastY, 2, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+  }
+
+  // ── Activity Feed ──────────────────────────────────────────
+  function addFeedItem(msg) {
+    const empty = document.getElementById('feed-empty');
+    if (empty) empty.remove();
+
+    const scroll = document.getElementById('feed-scroll');
+    const div = document.createElement('div');
+    div.className = 'feed-item type-' + (msg.type || 'message');
+
+    const time = new Date(msg.timestamp).toLocaleTimeString('en-US', {
+      hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+
+    let content = msg.content || '';
+    if (content.length > 300) content = content.substring(0, 300) + '...';
+
+    div.innerHTML =
+      '<div class="feed-from">' + escapeHtml(msg.from || 'System') + '</div>' +
+      '<div class="feed-content">' + escapeHtml(content) + '</div>' +
+      '<div class="feed-time">' + time + '</div>';
+
+    scroll.appendChild(div);
+
+    // Auto-scroll if near bottom
+    if (scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 100) {
+      scroll.scrollTop = scroll.scrollHeight;
+    }
+
+    // Cap DOM elements
+    while (scroll.children.length > 100) {
+      scroll.removeChild(scroll.firstChild);
+    }
+  }
+
+  function escapeHtml(str) {
+    const el = document.createElement('span');
+    el.textContent = str;
+    return el.innerHTML;
+  }
+
+  // ── SVG Topology ───────────────────────────────────────────
+  const NODE_RADIUS = 42;
+  const HUB_RADIUS = 32;
+  let topoNodes = {};
+
+  function buildTopology() {
+    const svg = document.getElementById('topo-svg');
+    const container = document.getElementById('topology');
+    const rect = container.getBoundingClientRect();
+    const headerH = 33; // panel header height
+    const w = rect.width;
+    const h = rect.height - headerH;
+    const cx = w / 2;
+    const cy = h / 2 + headerH;
+
+    svg.innerHTML = '';
+    svg.setAttribute('viewBox', `0 0 ${w} ${h + headerH}`);
+
+    // Defs: gradients and filters
+    const defs = svgEl('defs');
+    defs.innerHTML = `
+      <filter id="glow-amber" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="4" result="blur"/>
+        <feFlood flood-color="#d4a047" flood-opacity="0.3"/>
+        <feComposite in2="blur" operator="in"/>
+        <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <radialGradient id="hub-grad" cx="50%" cy="50%">
+        <stop offset="0%" stop-color="#16161e"/>
+        <stop offset="100%" stop-color="#0a0a0f"/>
+      </radialGradient>
+    `;
+    svg.appendChild(defs);
+
+    const names = Object.keys(state.agents);
+    const count = names.length || 4;
+    const orbitRadius = Math.min(w, h) * 0.32;
+
+    // Circuit lines from hub to each node
+    const linesGroup = svgEl('g', { class: 'circuit-lines' });
+    svg.appendChild(linesGroup);
+
+    // Hub center
+    const hub = svgEl('circle', {
+      cx, cy, r: HUB_RADIUS,
+      class: 'center-hub',
+      fill: 'url(#hub-grad)',
+    });
+    svg.appendChild(hub);
+
+    const hubLabel = svgEl('text', {
+      x: cx, y: cy - 6,
+      class: 'center-label',
+    });
+    hubLabel.textContent = 'ROOM';
+    svg.appendChild(hubLabel);
+
+    const tickLabel = svgEl('text', {
+      x: cx, y: cy + 12,
+      class: 'center-tick',
+      id: 'topo-tick-label',
+    });
+    tickLabel.textContent = '#' + state.tickNumber;
+    svg.appendChild(tickLabel);
+
+    // Agent nodes arranged in circle
+    names.forEach((name, i) => {
+      const angle = (i / count) * Math.PI * 2 - Math.PI / 2;
+      const nx = cx + Math.cos(angle) * orbitRadius;
+      const ny = cy + Math.sin(angle) * orbitRadius;
+
+      const agentState = state.agents[name] || { fsm: 'IDLE', energy: 0, boredom: 0, mood: 0, cooldownRemaining: 0 };
+
+      // Circuit line
+      const line = svgEl('line', {
+        x1: cx, y1: cy, x2: nx, y2: ny,
+        class: 'circuit-line',
+        id: 'line-' + name,
+      });
+      linesGroup.appendChild(line);
+
+      // Pulse overlay (hidden, animated on events)
+      const pulse = svgEl('line', {
+        x1: cx, y1: cy, x2: nx, y2: ny,
+        class: 'circuit-pulse',
+        id: 'pulse-' + name,
+      });
+      linesGroup.appendChild(pulse);
+
+      // Node group
+      const g = svgEl('g', { id: 'node-' + name });
+
+      // Outer ring
+      const ring = svgEl('circle', {
+        cx: nx, cy: ny, r: NODE_RADIUS,
+        class: 'node-ring ' + agentState.fsm,
+        id: 'ring-' + name,
+      });
+      g.appendChild(ring);
+
+      // Core fill
+      const core = svgEl('circle', {
+        cx: nx, cy: ny, r: NODE_RADIUS - 3,
+        class: 'node-core ' + agentState.fsm,
+        id: 'core-' + name,
+      });
+      g.appendChild(core);
+
+      // Energy arc
+      const arcPath = describeArc(nx, ny, NODE_RADIUS + 4, 0, (agentState.energy / 100) * 360);
+      const energyArc = svgEl('path', {
+        d: arcPath,
+        class: 'energy-arc',
+        id: 'arc-' + name,
+        stroke: agentState.energy > 25 ? '#68d391' : '#e85d75',
+        'stroke-dasharray': arcLength(NODE_RADIUS + 4, (agentState.energy / 100) * 360) + ' 999',
+      });
+      g.appendChild(energyArc);
+
+      // Name label
+      const label = svgEl('text', {
+        x: nx, y: ny - 4,
+        class: 'node-label',
+      });
+      label.textContent = name;
+      g.appendChild(label);
+
+      // State label
+      const stateLabel = svgEl('text', {
+        x: nx, y: ny + 12,
+        class: 'node-state-label ' + agentState.fsm,
+        id: 'state-' + name,
+      });
+      stateLabel.textContent = agentState.fsm;
+      g.appendChild(stateLabel);
+
+      svg.appendChild(g);
+      topoNodes[name] = { x: nx, y: ny, angle };
+    });
+  }
+
+  function updateAgentNode(name, agentState) {
+    const ring = document.getElementById('ring-' + name);
+    const core = document.getElementById('core-' + name);
+    const stateLabel = document.getElementById('state-' + name);
+    const arc = document.getElementById('arc-' + name);
+
+    if (!ring) return;
+
+    // Update FSM state classes
+    ring.setAttribute('class', 'node-ring ' + agentState.fsm);
+    core.setAttribute('class', 'node-core ' + agentState.fsm);
+    stateLabel.setAttribute('class', 'node-state-label ' + agentState.fsm);
+    stateLabel.textContent = agentState.fsm;
+
+    // Update energy arc
+    if (arc) {
+      const maxEnergy = 100; // default max
+      const pct = Math.max(0, Math.min(1, agentState.energy / maxEnergy));
+      const node = topoNodes[name];
+      if (node) {
+        const newPath = describeArc(node.x, node.y, NODE_RADIUS + 4, 0, pct * 360);
+        arc.setAttribute('d', newPath);
+        arc.setAttribute('stroke', pct > 0.25 ? '#68d391' : '#e85d75');
+      }
+    }
+  }
+
+  function updateCenterHub() {
+    const label = document.getElementById('topo-tick-label');
+    if (label) label.textContent = '#' + state.tickNumber;
+  }
+
+  function fireCircuitPulse(agentName) {
+    const pulse = document.getElementById('pulse-' + agentName);
+    if (!pulse) return;
+
+    pulse.style.opacity = '1';
+    pulse.style.transition = 'none';
+    pulse.setAttribute('stroke', '#d4a047');
+    pulse.setAttribute('stroke-width', '2');
+
+    requestAnimationFrame(() => {
+      pulse.style.transition = 'opacity 1.5s ease-out';
+      pulse.style.opacity = '0';
+    });
+  }
+
+  // ── SVG Helpers ────────────────────────────────────────────
+  function svgEl(tag, attrs) {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    if (attrs) {
+      for (const [k, v] of Object.entries(attrs)) {
+        el.setAttribute(k, v);
+      }
+    }
+    return el;
+  }
+
+  function polarToCartesian(cx, cy, r, degrees) {
+    const rad = (degrees - 90) * Math.PI / 180;
+    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+  }
+
+  function describeArc(cx, cy, r, startAngle, endAngle) {
+    if (endAngle <= 0) return 'M ' + cx + ' ' + (cy - r);
+    if (endAngle >= 360) endAngle = 359.99;
+    const start = polarToCartesian(cx, cy, r, endAngle);
+    const end = polarToCartesian(cx, cy, r, startAngle);
+    const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+    return [
+      'M', start.x, start.y,
+      'A', r, r, 0, largeArc, 0, end.x, end.y,
+    ].join(' ');
+  }
+
+  function arcLength(r, degrees) {
+    return (degrees / 360) * 2 * Math.PI * r;
+  }
+
+  // ── Agent Cards ────────────────────────────────────────────
+  function buildAgentCards() {
+    const container = document.getElementById('agents-container');
+    container.innerHTML = '';
+
+    for (const [name, agentState] of Object.entries(state.agents)) {
+      const card = document.createElement('div');
+      card.className = 'agent-card state-' + agentState.fsm;
+      card.id = 'card-' + name;
+      card.innerHTML = buildCardHTML(name, agentState);
+      container.appendChild(card);
+    }
+  }
+
+  function buildCardHTML(name, s) {
+    const maxEnergy = 100;
+    const energyPct = Math.max(0, Math.min(100, (s.energy / maxEnergy) * 100));
+    const boredomPct = Math.max(0, Math.min(100, s.boredom));
+    const moodPct = ((s.mood + 1) / 2) * 100; // -1..1 -> 0..100
+    const cooldownPct = s.cooldownRemaining > 0 ? Math.min(100, (s.cooldownRemaining / 5) * 100) : 0;
+
+    return `
+      <div class="agent-name">
+        <span>${escapeHtml(name)}</span>
+        <span class="agent-state-badge badge-${s.fsm}">${s.fsm}</span>
+      </div>
+      <div class="agent-gauges">
+        <div class="gauge">
+          <div class="gauge-label">
+            <span>Energy</span>
+            <span class="gauge-value">${Math.round(s.energy)}</span>
+          </div>
+          <div class="gauge-bar"><div class="gauge-fill energy ${energyPct < 25 ? 'low' : ''}" style="width:${energyPct}%"></div></div>
+        </div>
+        <div class="gauge">
+          <div class="gauge-label">
+            <span>Boredom</span>
+            <span class="gauge-value">${Math.round(s.boredom)}</span>
+          </div>
+          <div class="gauge-bar"><div class="gauge-fill boredom" style="width:${boredomPct}%"></div></div>
+        </div>
+        <div class="gauge">
+          <div class="gauge-label">
+            <span>Mood</span>
+            <span class="gauge-value">${s.mood >= 0 ? '+' : ''}${s.mood.toFixed(1)}</span>
+          </div>
+          <div class="gauge-bar"><div class="gauge-fill ${s.mood >= 0 ? 'mood-pos' : 'mood-neg'}" style="width:${moodPct}%"></div></div>
+        </div>
+        <div class="gauge">
+          <div class="gauge-label">
+            <span>Cooldown</span>
+            <span class="gauge-value">${s.cooldownRemaining}</span>
+          </div>
+          <div class="gauge-bar"><div class="gauge-fill cooldown" style="width:${cooldownPct}%"></div></div>
+        </div>
+      </div>
+    `;
+  }
+
+  function updateAgentCard(name, agentState) {
+    const card = document.getElementById('card-' + name);
+    if (!card) return;
+    card.className = 'agent-card state-' + agentState.fsm;
+    card.innerHTML = buildCardHTML(name, agentState);
+  }
+
+  // ── Window Resize ──────────────────────────────────────────
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (Object.keys(state.agents).length > 0) buildTopology();
+    }, 200);
+  });
+
+  // ── Periodic engram count fetch ────────────────────────────
+  async function fetchEngramCount() {
+    try {
+      const res = await fetch('/api/engrams');
+      if (res.ok) {
+        const data = await res.json();
+        state.engramCount = data.count || 0;
+        updateMetrics();
+      }
+    } catch(e) { /* ignore */ }
+  }
+
+  // ── Boot ───────────────────────────────────────────────────
+  connect();
+  fetchEngramCount();
+  setInterval(fetchEngramCount, 30000);
+
+  // Initial sparkline seed
+  for (let i = 0; i < 5; i++) {
+    pushHistory('tick', 0);
+    pushHistory('active', 0);
+    pushHistory('messages', 0);
+    pushHistory('engrams', 0);
+  }
+  updateMetrics();
+})();
+</script>
+</body>
+</html>

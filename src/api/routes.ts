@@ -1,6 +1,7 @@
 /**
  * REST API route handlers.
  *
+ * GET  /               — Live dashboard
  * POST /api/task       — Submit a topic for analysis
  * GET  /api/engrams    — List engrams
  * GET  /api/engrams/:id — Get specific engram
@@ -8,9 +9,22 @@
  * GET  /api/health     — Health check
  */
 
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 import type { Room } from "../runner/room.js";
 import type { EngramStore } from "../engram/store.js";
 import type { Task } from "../runner/types.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DASHBOARD_PATH = resolve(__dirname, "../dashboard.html");
+let dashboardHtml: string | null = null;
+
+async function getDashboardHtml(): Promise<string> {
+  if (!dashboardHtml) {
+    dashboardHtml = await Bun.file(DASHBOARD_PATH).text();
+  }
+  return dashboardHtml;
+}
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data, null, 2), {
@@ -31,6 +45,14 @@ export async function handleRoutes(
 ): Promise<Response> {
   const method = req.method;
   const path = url.pathname;
+
+  // Dashboard
+  if ((path === "/" || path === "/dashboard") && method === "GET") {
+    const html = await getDashboardHtml();
+    return new Response(html, {
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
 
   // Health check
   if (path === "/api/health" && method === "GET") {
