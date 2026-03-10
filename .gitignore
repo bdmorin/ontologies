@@ -4,5 +4,6 @@ dist/
 .env
 .env.*
 engrams/
+output/
 tmp/
 bun.lock
