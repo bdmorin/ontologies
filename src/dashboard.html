@@ -10,25 +10,25 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --void: #0a0a0f;
-    --void-soft: #111118;
-    --void-surface: #16161e;
-    --void-border: rgba(255,255,255,0.04);
-    --void-border-bright: rgba(255,255,255,0.08);
-    --amber: #d4a047;
-    --amber-dim: rgba(212,160,71,0.15);
-    --amber-glow: rgba(212,160,71,0.3);
-    --teal: #4fd1c5;
-    --teal-dim: rgba(79,209,197,0.12);
-    --teal-glow: rgba(79,209,197,0.25);
-    --text: #c8c8d0;
-    --text-dim: #6b6b78;
-    --text-bright: #e8e8f0;
-    --red: #e85d75;
-    --red-dim: rgba(232,93,117,0.15);
-    --green: #68d391;
-    --blue: #63b3ed;
-    --purple: #b794f4;
+    --void: #0c0c12;
+    --void-soft: #131320;
+    --void-surface: #1a1a28;
+    --void-border: rgba(255,255,255,0.08);
+    --void-border-bright: rgba(255,255,255,0.15);
+    --amber: #e8b44c;
+    --amber-dim: rgba(232,180,76,0.18);
+    --amber-glow: rgba(232,180,76,0.35);
+    --teal: #5ee9db;
+    --teal-dim: rgba(94,233,219,0.14);
+    --teal-glow: rgba(94,233,219,0.3);
+    --text: #d8d8e3;
+    --text-dim: #9494a8;
+    --text-bright: #f0f0f8;
+    --red: #f06b83;
+    --red-dim: rgba(240,107,131,0.18);
+    --green: #7ae0a0;
+    --blue: #7cc4f0;
+    --purple: #c9a8f8;
 
     --font-body: 'Instrument Sans', -apple-system, sans-serif;
     --font-mono: 'IBM Plex Mono', 'SF Mono', monospace;
@@ -144,7 +144,7 @@
   .metric-label {
     text-transform: uppercase;
     letter-spacing: 0.8px;
-    font-size: 9px;
+    font-size: 10px;
   }
 
   /* Panels */
@@ -158,11 +158,11 @@
     padding: 10px 14px;
     border-bottom: 1px solid var(--void-border);
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 1.2px;
-    color: var(--text-dim);
+    color: var(--text);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -235,7 +235,7 @@
 
   .feed-time {
     font-family: var(--font-mono);
-    font-size: 9px;
+    font-size: 10px;
     color: var(--text-dim);
     margin-top: 2px;
   }
@@ -306,9 +306,9 @@
   }
 
   .agent-state-badge {
-    font-size: 9px;
-    font-weight: 500;
-    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 10px;
     border-radius: 10px;
     text-transform: uppercase;
     letter-spacing: 0.8px;
@@ -334,20 +334,21 @@
 
   .gauge-label {
     font-family: var(--font-mono);
-    font-size: 9px;
+    font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.6px;
-    color: var(--text-dim);
+    color: var(--text);
     display: flex;
     justify-content: space-between;
   }
 
   .gauge-value {
-    color: var(--text);
+    color: var(--text-bright);
+    font-weight: 500;
   }
 
   .gauge-bar {
-    height: 3px;
+    height: 4px;
     background: var(--void-surface);
     border-radius: 2px;
     overflow: hidden;
@@ -393,10 +394,10 @@
 
   .metric-card-label {
     font-family: var(--font-mono);
-    font-size: 9px;
+    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 1px;
-    color: var(--text-dim);
+    color: var(--text);
   }
 
   .metric-card-value {
@@ -479,8 +480,8 @@
 
   .node-label {
     font-family: var(--font-mono);
-    font-size: 11px;
-    font-weight: 500;
+    font-size: 12px;
+    font-weight: 600;
     fill: var(--text-bright);
     text-anchor: middle;
     pointer-events: none;
@@ -488,8 +489,8 @@
 
   .node-state-label {
     font-family: var(--font-mono);
-    font-size: 9px;
-    font-weight: 400;
+    font-size: 10px;
+    font-weight: 500;
     text-anchor: middle;
     pointer-events: none;
     text-transform: uppercase;
@@ -497,7 +498,7 @@
     transition: fill 0.5s;
   }
 
-  .node-state-label.IDLE { fill: var(--text-dim); }
+  .node-state-label.IDLE { fill: var(--text); }
   .node-state-label.RESPONDING { fill: var(--amber); }
   .node-state-label.EMOTING { fill: var(--purple); }
   .node-state-label.COOLDOWN { fill: var(--blue); }
@@ -523,8 +524,8 @@
 
   .center-label {
     font-family: var(--font-mono);
-    font-size: 9px;
-    fill: var(--text-dim);
+    font-size: 10px;
+    fill: var(--text);
     text-anchor: middle;
     text-transform: uppercase;
     letter-spacing: 1px;
