@@ -49,10 +49,14 @@ async function main() {
   }
   console.log(`[Room] ${agentConfigs.length} agents loaded`);
 
-  // 4. Create MCP research tools server
-  const researchServer = createResearchServer();
+  // 4. MCP research tools — factory creates a fresh server per query()
+  // Each Agent SDK query() connects its own transport to the MCP server.
+  // Sharing a single instance across concurrent queries causes
+  // "Already connected to a transport" errors.
   const runtimeConfig: AgentRuntimeConfig = {
-    mcpServers: { "ontologies-research": researchServer },
+    mcpServerFactory: () => ({
+      "ontologies-research": createResearchServer(),
+    }),
     maxTurns: 10,
     timeoutMs: 120_000,
   };

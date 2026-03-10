@@ -17,6 +17,9 @@ import {
 import type { Agent, RoomMessage, Task } from "../runner/types.js";
 import type { McpServer } from "./tools.js";
 
+/** Factory that creates a fresh MCP server per query() call. */
+export type McpServerFactory = () => Record<string, McpServer>;
+
 /** Extract JSON from text — multi-strategy, resilient to LLM prose preambles. */
 export function extractJson(text: string): Record<string, unknown> | null {
   // Strategy 1: direct parse
@@ -116,8 +119,13 @@ function buildPrompt(
 }
 
 export interface AgentRuntimeConfig {
-  /** MCP servers to provide to agents */
-  mcpServers: Record<string, McpServer>;
+  /**
+   * Factory that creates a fresh set of MCP servers per query() call.
+   * Each query() connects its own transport to the MCP server — sharing
+   * a single instance across concurrent queries causes "Already connected
+   * to a transport" errors.
+   */
+  mcpServerFactory: McpServerFactory;
   /** Max turns for Agent SDK query() (default: 10) */
   maxTurns: number;
   /** Timeout per agent query in ms (default: 120000) */
@@ -147,6 +155,18 @@ export async function executeAgentResponse(
   const startTime = Date.now();
   const prompt = buildPrompt(agent, context, task);
 
+  // Create a fresh MCP server set for this query — each query() connects
+  // its own transport, so sharing a single instance across concurrent
+  // queries causes "Already connected to a transport" errors.
+  const mcpServers = runtimeConfig.mcpServerFactory();
+
+  // Build a clean env that strips CLAUDECODE to avoid the
+  // "cannot be launched inside another Claude Code session" guard.
+  // This allows the SDK subprocess to start even when the ontologies
+  // server itself is running inside a Claude Code session.
+  const cleanEnv: Record<string, string | undefined> = { ...process.env };
+  delete cleanEnv.CLAUDECODE;
+
   const queryStream = query({
     prompt,
     options: {
@@ -156,8 +176,9 @@ export async function executeAgentResponse(
       permissionMode: "bypassPermissions",
       allowDangerouslySkipPermissions: true,
       tools: [], // disable built-in Claude Code tools — MCP only
-      mcpServers: runtimeConfig.mcpServers,
+      mcpServers,
       persistSession: false,
+      env: cleanEnv,
     },
   });
 

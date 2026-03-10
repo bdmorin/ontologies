@@ -1,0 +1,15 @@
+node_modules/
+dist/
+engrams/
+output/
+tmp/
+docs/
+scenes/
+tests/
+*.log
+.env
+.env.*
+.git/
+.gitignore
+.dockerignore
+Dockerfile
