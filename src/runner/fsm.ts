@@ -117,9 +117,13 @@ function evaluateIdle(
       return { nextState: "IDLE" };
     }
 
-    // Scene events — bypass energy checks (narrative pacemaker)
+    // Scene events — only trigger responses when a task is active
     case "scene":
-      return { nextState: "RESPONDING", action: "respond" };
+      if (hasActiveTask && hasEnergy) {
+        return { nextState: "RESPONDING", action: "respond" };
+      }
+      // No task? Just emote in response to the scene
+      return { nextState: "EMOTING", action: "emote", emoteCategory: "idle" };
 
     default:
       return { nextState: "IDLE" };

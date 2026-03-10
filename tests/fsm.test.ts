@@ -184,18 +184,32 @@ describe("evaluateFSM", () => {
       expect(transition.nextState).toBe("IDLE");
     });
 
-    it("transitions to RESPONDING on scene event (NMI, bypasses energy)", () => {
+    it("transitions to RESPONDING on scene event when task is active", () => {
       const config = makeConfig();
-      const state = makeState({ energy: 0 }); // no energy, doesn't matter
+      const state = makeState({ energy: 80 });
       const event: EngineEvent = {
         type: "scene",
         content: "*A new development emerges*",
         timestamp: Date.now(),
       };
 
-      const transition = evaluateFSM(event, state, config);
+      const transition = evaluateFSM(event, state, config, true);
       expect(transition.nextState).toBe("RESPONDING");
       expect(transition.action).toBe("respond");
+    });
+
+    it("emotes on scene event when no task is active", () => {
+      const config = makeConfig();
+      const state = makeState({ energy: 80 });
+      const event: EngineEvent = {
+        type: "scene",
+        content: "*A new development emerges*",
+        timestamp: Date.now(),
+      };
+
+      const transition = evaluateFSM(event, state, config, false);
+      expect(transition.nextState).toBe("EMOTING");
+      expect(transition.action).toBe("emote");
     });
   });
 
