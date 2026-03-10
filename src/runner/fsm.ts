@@ -21,12 +21,13 @@ export function evaluateFSM(
   event: EngineEvent,
   state: AgentState,
   config: AgentConfig,
+  hasActiveTask = false,
 ): FSMTransition {
   const hasEnergy = state.energy >= config.energy.responseCost;
 
   switch (state.fsm) {
     case "IDLE":
-      return evaluateIdle(event, state, config, hasEnergy);
+      return evaluateIdle(event, state, config, hasEnergy, hasActiveTask);
 
     // RESPONDING state — the room handles transitioning to COOLDOWN
     // after the Agent SDK query() completes.
@@ -52,6 +53,7 @@ function evaluateIdle(
   state: AgentState,
   config: AgentConfig,
   hasEnergy: boolean,
+  hasActiveTask: boolean,
 ): FSMTransition {
   switch (event.type) {
     case "message": {
@@ -83,8 +85,9 @@ function evaluateIdle(
     }
 
     case "tick": {
-      // Boredom-driven initiation
-      if (state.boredom >= config.boredom.threshold && hasEnergy) {
+      // Boredom-driven initiation — only when a task is active
+      // (prevents idle void-screaming that burns tokens for nothing)
+      if (hasActiveTask && state.boredom >= config.boredom.threshold && hasEnergy) {
         return { nextState: "RESPONDING", action: "initiate" };
       }
 

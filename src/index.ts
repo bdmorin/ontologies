@@ -70,6 +70,15 @@ async function main() {
         task,
         runtimeConfig,
       );
+
+      // Emit tool usage for the dashboard
+      room.emitEvent("agentToolUsage", {
+        agent: agent.config.name,
+        toolUsage: response.toolUsage,
+        tokenUsage: response.tokenUsage,
+        durationMs: response.durationMs,
+      });
+
       return response.raw;
     },
   );

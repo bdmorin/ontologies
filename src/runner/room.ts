@@ -180,6 +180,11 @@ export class Room {
     this.eventBus.off(type, handler);
   }
 
+  /** Public event emit — for external modules to push events through the bus. */
+  emitEvent(type: string, ...args: unknown[]): void {
+    this.eventBus.emit(type, ...args);
+  }
+
   // -- Response callback --
 
   onNeedResponse(handler: ResponseHandler): void {
@@ -331,7 +336,7 @@ export class Room {
     agent: Agent,
     event: EngineEvent,
   ): Promise<void> {
-    const transition = evaluateFSM(event, agent.state, agent.config);
+    const transition = evaluateFSM(event, agent.state, agent.config, this.activeTask !== null);
     agent.state = { ...agent.state, fsm: transition.nextState };
 
     switch (transition.action) {

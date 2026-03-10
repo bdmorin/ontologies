@@ -132,11 +132,19 @@ export interface AgentRuntimeConfig {
   timeoutMs: number;
 }
 
+export interface ToolUsage {
+  /** Total MCP/SDK tool calls observed during the query. */
+  total: number;
+  /** Breakdown by tool name. */
+  byTool: Record<string, number>;
+}
+
 export interface AgentResponse {
   agentName: string;
   raw: string;
   parsed: Record<string, unknown> | null;
   tokenUsage: { input: number; output: number };
+  toolUsage: ToolUsage;
   durationMs: number;
 }
 
@@ -184,6 +192,10 @@ export async function executeAgentResponse(
 
   let resultMessage: SDKResultSuccess | null = null;
 
+  // Track tool calls from stream events
+  const toolCounts: Record<string, number> = {};
+  let totalToolCalls = 0;
+
   // Race the query against a timeout
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(
@@ -198,8 +210,21 @@ export async function executeAgentResponse(
         if (message.type === "result" && message.subtype === "success") {
           resultMessage = message as SDKResultSuccess;
         }
+
+        // Count tool_progress events (emitted per active tool call)
+        if (message.type === "tool_progress") {
+          const toolUseId = (message as { tool_use_id?: string }).tool_use_id;
+          if (toolUseId && !seenToolIds.has(toolUseId)) {
+            seenToolIds.add(toolUseId);
+            const toolName = (message as { tool_name?: string }).tool_name ?? "unknown";
+            toolCounts[toolName] = (toolCounts[toolName] ?? 0) + 1;
+            totalToolCalls++;
+          }
+        }
       }
     };
+
+    const seenToolIds = new Set<string>();
 
     await Promise.race([iterateQuery(), timeoutPromise]);
   } catch (err) {
@@ -210,6 +235,7 @@ export async function executeAgentResponse(
       raw: `Error: ${err instanceof Error ? err.message : String(err)}`,
       parsed: null,
       tokenUsage: { input: 0, output: 0 },
+      toolUsage: { total: totalToolCalls, byTool: toolCounts },
       durationMs,
     };
   }
@@ -222,6 +248,7 @@ export async function executeAgentResponse(
       raw: "Agent SDK query completed without a success result",
       parsed: null,
       tokenUsage: { input: 0, output: 0 },
+      toolUsage: { total: totalToolCalls, byTool: toolCounts },
       durationMs,
     };
   }
@@ -242,9 +269,15 @@ export async function executeAgentResponse(
 
   const parsed = extractJson(resultText);
 
+  const toolUsage: ToolUsage = { total: totalToolCalls, byTool: toolCounts };
+
+  const toolSummary = totalToolCalls > 0
+    ? `, tools=${totalToolCalls} [${Object.entries(toolCounts).map(([k, v]) => `${k}:${v}`).join(", ")}]`
+    : ", tools=0";
+
   console.log(
     `[AgentRuntime] ${agent.config.name} responded (${durationMs}ms, ` +
-      `${inputTokens + outputTokens} tokens, ` +
+      `${inputTokens + outputTokens} tokens${toolSummary}, ` +
       `JSON=${parsed ? "yes" : "no"})`,
   );
 
@@ -253,6 +286,7 @@ export async function executeAgentResponse(
     raw: resultText,
     parsed,
     tokenUsage: { input: inputTokens, output: outputTokens },
+    toolUsage,
     durationMs,
   };
 }

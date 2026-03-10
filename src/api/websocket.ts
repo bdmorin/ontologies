@@ -50,6 +50,14 @@ function wireRoomEvents(room: Room): void {
       timestamp: Date.now(),
     });
   });
+
+  room.on("agentToolUsage", (data: unknown) => {
+    broadcast({
+      type: "agentToolUsage",
+      ...(data as Record<string, unknown>),
+      timestamp: Date.now(),
+    });
+  });
 }
 
 function broadcast(data: unknown): void {

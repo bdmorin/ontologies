@@ -503,6 +503,38 @@
   .node-state-label.EMOTING { fill: var(--purple); }
   .node-state-label.COOLDOWN { fill: var(--blue); }
 
+  .node-tool-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    fill: var(--teal);
+    text-anchor: middle;
+    opacity: 0.85;
+  }
+
+  .tool-chip {
+    display: inline-block;
+    background: var(--teal-dim);
+    color: var(--teal);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    margin-right: 3px;
+  }
+  .tool-chip b { color: var(--text-bright); }
+
+  .tool-tokens {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-left: 4px;
+  }
+
+  .tool-usage-row {
+    margin-top: 4px;
+    line-height: 1.8;
+  }
+
   .circuit-line {
     stroke: var(--void-border-bright);
     stroke-width: 1;
@@ -711,6 +743,8 @@
     messages: [],     // feed items
     messageCount: 0,
     engramCount: 0,
+    // Tool usage tracking per agent
+    toolUsage: {},    // name -> { total, byTool: { toolName: count }, tokens, durationMs }
     // Sparkline histories (last 60 data points)
     history: {
       tick: [],
@@ -777,6 +811,9 @@
         break;
       case 'taskComplete':
         handleTaskComplete(msg.task);
+        break;
+      case 'agentToolUsage':
+        handleToolUsage(msg);
         break;
     }
   }
@@ -852,6 +889,58 @@
     banner.classList.remove('visible');
 
     updateMetrics();
+  }
+
+  function handleToolUsage(msg) {
+    const name = msg.agent;
+    const usage = msg.toolUsage || { total: 0, byTool: {} };
+    const prev = state.toolUsage[name] || { total: 0, byTool: {}, tokens: 0, durationMs: 0 };
+
+    // Accumulate
+    prev.total += usage.total;
+    for (const [tool, count] of Object.entries(usage.byTool || {})) {
+      prev.byTool[tool] = (prev.byTool[tool] || 0) + count;
+    }
+    prev.tokens += (msg.tokenUsage?.input || 0) + (msg.tokenUsage?.output || 0);
+    prev.durationMs += msg.durationMs || 0;
+    state.toolUsage[name] = prev;
+
+    updateToolLabel(name);
+    updateAgentCardToolUsage(name);
+  }
+
+  function updateToolLabel(name) {
+    const el = document.getElementById('tools-' + name);
+    if (!el) return;
+    const usage = state.toolUsage[name];
+    if (!usage || usage.total === 0) {
+      el.textContent = '';
+      return;
+    }
+    // Compact summary: "4 tools" or breakdown if few types
+    const entries = Object.entries(usage.byTool);
+    if (entries.length <= 2) {
+      el.textContent = entries.map(([t, c]) => t.replace('mcp__ontologies-research__', '') + ':' + c).join(' ');
+    } else {
+      el.textContent = usage.total + ' calls';
+    }
+  }
+
+  function updateAgentCardToolUsage(name) {
+    const el = document.getElementById('card-tools-' + name);
+    if (!el) return;
+    const usage = state.toolUsage[name];
+    if (!usage || usage.total === 0) {
+      el.innerHTML = '';
+      return;
+    }
+    const entries = Object.entries(usage.byTool);
+    const lines = entries.map(([t, c]) => {
+      const short = t.replace('mcp__ontologies-research__', '');
+      return '<span class="tool-chip">' + escapeHtml(short) + ' <b>' + c + '</b></span>';
+    }).join(' ');
+    el.innerHTML = '<div class="tool-usage-row">' + lines +
+      ' <span class="tool-tokens">' + usage.tokens.toLocaleString() + ' tok</span></div>';
   }
 
   // ── Sparkline History ──────────────────────────────────────
@@ -1140,6 +1229,15 @@
       stateLabel.textContent = agentState.fsm;
       g.appendChild(stateLabel);
 
+      // Tool usage label (below node)
+      const toolLabel = svgEl('text', {
+        x: nx, y: ny + NODE_RADIUS + 18,
+        class: 'node-tool-label',
+        id: 'tools-' + name,
+      });
+      toolLabel.textContent = '';
+      g.appendChild(toolLabel);
+
       svg.appendChild(g);
       topoNodes[name] = { x: nx, y: ny, angle };
     });
@@ -1280,6 +1378,7 @@
           <div class="gauge-bar"><div class="gauge-fill cooldown" style="width:${cooldownPct}%"></div></div>
         </div>
       </div>
+      <div id="card-tools-${escapeHtml(name)}" class="card-tool-usage"></div>
     `;
   }
 
@@ -1288,6 +1387,8 @@
     if (!card) return;
     card.className = 'agent-card state-' + agentState.fsm;
     card.innerHTML = buildCardHTML(name, agentState);
+    // Re-apply tool usage after card rebuild
+    updateAgentCardToolUsage(name);
   }
 
   // ── Window Resize ──────────────────────────────────────────

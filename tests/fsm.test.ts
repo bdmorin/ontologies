@@ -123,9 +123,22 @@ describe("evaluateFSM", () => {
         timestamp: Date.now(),
       };
 
-      const transition = evaluateFSM(event, state, config);
+      const transition = evaluateFSM(event, state, config, true); // hasActiveTask
       expect(transition.nextState).toBe("RESPONDING");
       expect(transition.action).toBe("initiate");
+    });
+
+    it("does not initiate on boredom if no active task", () => {
+      const config = makeConfig();
+      const state = makeState({ boredom: 55 });
+      const event: EngineEvent = {
+        type: "tick",
+        tickNumber: 1,
+        timestamp: Date.now(),
+      };
+
+      const transition = evaluateFSM(event, state, config, false);
+      expect(transition.nextState).toBe("IDLE");
     });
 
     it("does not initiate on boredom if no energy", () => {
