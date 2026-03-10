@@ -9,6 +9,11 @@ RUN bun install --frozen-lockfile 2>/dev/null || bun install
 # Copy source
 COPY . .
 
+# Run as non-root — Claude Code CLI refuses --dangerously-skip-permissions as root
+RUN groupadd -r ontologies && useradd -r -g ontologies -d /app ontologies \
+    && chown -R ontologies:ontologies /app
+USER ontologies
+
 # Expose API port
 EXPOSE 3000
 
